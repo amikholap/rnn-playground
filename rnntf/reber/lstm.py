@@ -8,7 +8,7 @@ from .input_providers import (
 
 def run(args):
     model = LSTMModel(
-        hidden_size=4,
+        hidden_size=args.hidden_size,
         output_size=ReberInputProvider.get_vocabulary_size(),
         is_training=True,
     )

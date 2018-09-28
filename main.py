@@ -16,6 +16,7 @@ def make_parser():
 
     reber_lstm = subparsers.add_parser('reber_lstm')
     reber_lstm.add_argument('--batch-size', type=int, default=128)
+    reber_lstm.add_argument('--hidden-size', type=int, default=4)
     reber_lstm.add_argument('--dataset-path', type=argparse.FileType('r'))
     reber_lstm.add_argument('--embedded', action='store_true')
     reber_lstm.set_defaults(func=rnntf.reber.lstm.run)
