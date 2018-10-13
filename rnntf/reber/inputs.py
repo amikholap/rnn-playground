@@ -1,12 +1,25 @@
+import numpy as np
 import tensorflow as tf
 
 from .fsm import EmbeddedReberFSM, ReberFSM
 
 
-class ReberInputProvider:
+class ReberInput:
 
     def __init__(self, *, batch_size):
         self._batch_size = batch_size
+
+    @classmethod
+    def get_feature_columns(cls):
+        feature_columns = [
+            tf.feature_column.indicator_column(
+                tf.contrib.feature_column.sequence_categorical_column_with_identity(
+                    'char',
+                    num_buckets=cls.get_vocabulary_size(),
+                ),
+            ),
+        ]
+        return feature_columns
 
     @classmethod
     def get_vocabulary_size(cls):
@@ -35,39 +48,56 @@ class ReberInputProvider:
     def __iter__(self):
         raise NotImplementedError
 
-    def _make_x_y(self, seq_batch):
+    def input_fn(self, labels=True):
+        x, y = next(iter(self))
+        features = {
+            'char': x,
+        }
+
+        if labels:
+            slices = (features, y)
+        else:
+            slices = features
+
+        dataset = tf.data.Dataset.from_tensor_slices(slices)
+        dataset = dataset.batch(self._batch_size)
+
+        return dataset
+
+    def input_fn_no_labels(self):
+        return self.input_fn(labels=False)
+
+    def _make_x_y(self, seq, padding=None):
+        x_chars = []
+        for char in seq:
+            char_id = self._get_char_id(char)
+            x_chars.append(char_id)
+
+        if padding and len(x_chars) < padding:
+            x_chars += [self.get_eos_id()] * (padding - len(x_chars))
+
+        y_chars = x_chars[1:]
+        y_chars.append(self.get_eos_id())
+
+        return x_chars, y_chars
+
+    def _make_x_y_batch(self, seq_batch):
         max_length = max([len(seq) for seq in seq_batch])
 
         x_char_batch = []
         y_char_batch = []
-
         for seq in seq_batch:
-            x_chars = []
-            for char in seq:
-                char_id = self._get_char_id(char)
-                x_chars.append(char_id)
-            if len(x_chars) < max_length:
-                x_chars += [self.get_eos_id()] * (max_length - len(x_chars))
-
-            y_chars = x_chars[1:]
-            y_chars.append(self.get_eos_id())
-
+            x_chars, y_chars = self._make_x_y(seq, padding=max_length)
             x_char_batch.append(x_chars)
             y_char_batch.append(y_chars)
 
-        x = tf.reshape(
-            tf.one_hot(x_char_batch, depth=self.get_vocabulary_size()),
-            [len(x_char_batch), max_length, self.get_vocabulary_size()],
-        )
-        y = tf.reshape(
-            tf.convert_to_tensor(y_char_batch, dtype=tf.int32),
-            [len(y_char_batch), max_length],
-        )
+        x = np.array(x_char_batch, dtype=np.int8)
+        y = np.array(y_char_batch, dtype=np.int32)
 
         return x, y
 
 
-class BaseFSMReberInputProvider(ReberInputProvider):
+class BaseFSMReberInput(ReberInput):
 
     def _get_fsm(self):
         raise NotImplementedError
@@ -82,12 +112,12 @@ class BaseFSMReberInputProvider(ReberInputProvider):
                 fsm.reset()
                 seq_batch.append(seq)
 
-            x, y = self._make_x_y(seq_batch)
+            x, y = self._make_x_y_batch(seq_batch)
 
             yield x, y
 
 
-class FSMEmbeddedInputProvider(BaseFSMReberInputProvider):
+class FSMEmbeddedInput(BaseFSMReberInput):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -97,7 +127,7 @@ class FSMEmbeddedInputProvider(BaseFSMReberInputProvider):
         return self._fsm
 
 
-class FSMReberInputProvider(BaseFSMReberInputProvider):
+class FSMReberInput(BaseFSMReberInput):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -107,7 +137,7 @@ class FSMReberInputProvider(BaseFSMReberInputProvider):
         return self._fsm
 
 
-class FileReberInputProvider(ReberInputProvider):
+class FileReberInput(ReberInput):
 
     def __init__(self, file_, **kwargs):
         super().__init__(**kwargs)
@@ -126,6 +156,6 @@ class FileReberInputProvider(ReberInputProvider):
             if not seq_batch:
                 break
 
-            x, y = self._make_x_y(seq_batch)
+            x, y = self._make_x_y_batch(seq_batch)
 
             yield x, y
