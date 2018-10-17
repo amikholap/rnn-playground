@@ -91,7 +91,7 @@ class ReberInput:
             x_char_batch.append(x_chars)
             y_char_batch.append(y_chars)
 
-        x = np.array(x_char_batch, dtype=np.int8)
+        x = np.array(x_char_batch, dtype=np.int32)
         y = np.array(y_char_batch, dtype=np.int32)
 
         return x, y

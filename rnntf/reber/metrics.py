@@ -27,6 +27,10 @@ class ReberAccuracy:
                         accuracy_miss += 1
                     self._fsm.transition_by_output(target_char)
 
+                # Don't count trailing EOS symbols.
+                if target_char == ReberInput.get_eos_id():
+                    break
+
         value = accuracy_hit / (accuracy_hit + accuracy_miss)
 
         return value

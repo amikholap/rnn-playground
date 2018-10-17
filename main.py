@@ -20,12 +20,17 @@ def make_parser():
     subparsers = parser.add_subparsers()
 
     reber = subparsers.add_parser('reber')
-    reber.add_argument('--estimator', choices=['lstm'], required=True)
-    reber.add_argument('--batch-size', type=int, default=128)
+    reber.add_argument('--estimator', choices=['lstm', 'transformer'], required=True)
+    reber.add_argument('--batch-size', type=int, default=256)
     reber.add_argument('--hidden-units', type=int, default=4)
     reber.add_argument('--dataset-path', type=argparse.FileType('r'))
     reber.add_argument('--embedded', action='store_true')
     reber.set_defaults(func=rnntf.reber.run.run)
+
+    for subparser in subparsers.choices.values():
+        subparser.add_argument('--learning-rate', type=float, default=0.1)
+        subparser.add_argument('--debug', action='store_true')
+        subparser.add_argument('--model-dir')
 
     return parser
 
